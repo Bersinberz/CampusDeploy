@@ -2,6 +2,8 @@ import { useState, useEffect, useRef } from 'react'
 import type { ChangeEvent } from 'react'
 import axios from 'axios'
 import { submitDeployment, streamCloneLogs } from '../services/deployService'
+import Loader from '../components/Loader'
+import MessageBox from '../components/MessageBox'
 
 interface DeployForm { name: string; email: string; repoUrl: string }
 type Stage = 'form' | 'cloning' | 'done'
@@ -92,14 +94,12 @@ export default function DeployPage() {
 
           {/* Result banner */}
           {isDone && (
-            <div className={`mt-4 p-4 rounded-xl border text-sm text-center ${
-              isError
-                ? 'bg-red-500/5 border-red-500/20 text-red-400'
-                : 'bg-emerald-500/5 border-emerald-500/20 text-emerald-400'
-            }`}>
-              {isError
-                ? '✗ Clone failed. Check the logs above.'
-                : 'Project cloned! Your code is ready on the server.'}
+            <div className="mt-4">
+              <MessageBox
+                type={isError ? 'error' : 'success'}
+                title={isError ? 'Clone failed' : 'Project cloned!'}
+                message={isError ? 'Something went wrong. Check the logs above.' : 'Your code is ready on the server.'}
+              />
             </div>
           )}
 
@@ -119,6 +119,7 @@ export default function DeployPage() {
   // ── Form view ──────────────────────────────────────────────────────
   return (
     <div className="min-h-screen bg-[#0a0a0f] flex items-center justify-center p-4 overflow-hidden">
+      {loading && <Loader fullScreen text="Queuing your deployment" />}
 
       <div className="pointer-events-none fixed inset-0">
         <div className="absolute top-[-20%] left-1/2 -translate-x-1/2 w-[600px] h-[600px] bg-violet-700/20 rounded-full blur-[120px]" />
@@ -163,10 +164,14 @@ export default function DeployPage() {
             </div>
 
             <div className="animate-slide-in delay-[400ms] pt-1">
-              {error && <p className="text-red-400 text-xs mb-3 text-center">{error}</p>}
+              {error && (
+                <div className="mb-3">
+                  <MessageBox type="error" title="Error" message={error} onClose={() => setError(null)} />
+                </div>
+              )}
               <button type="submit" disabled={loading}
                 className="w-full py-3.5 rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 text-white font-semibold text-sm tracking-wide shadow-lg shadow-violet-900/40 hover:shadow-violet-700/50 hover:-translate-y-0.5 active:translate-y-0 transition-all duration-200 cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:translate-y-0">
-                {loading ? 'Queuing...' : 'Deploy my project'}
+                {loading ? 'Deploying...' : 'Deploy my project'}
               </button>
             </div>
 
