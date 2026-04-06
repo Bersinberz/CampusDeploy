@@ -3,6 +3,7 @@ import path from 'path'
 import fs from 'fs'
 import simpleGit from 'simple-git'
 import { Deployment } from '../models/Deployment.js'
+import { analyzeAndModifyProject } from '../services/openclawAgent.js'
 
 const PROJECTS_DIR = path.resolve('projects')
 
@@ -42,10 +43,13 @@ export const cloneDeployment = async (req: Request, res: Response) => {
 
   const send = (msg: string) => res.write(`data: ${msg}\n\n`)
 
-  const cloneDir = path.join(PROJECTS_DIR, id)
+  // Generate sequential folder name: Proj-01, Proj-02 ...
+  const count = await Deployment.countDocuments()
+  const folderName = `Proj-${String(count).padStart(2, '0')}`
+  const cloneDir = path.join(PROJECTS_DIR, folderName)
 
   try {
-    await Deployment.findByIdAndUpdate(id, { status: 'building' })
+    await Deployment.findByIdAndUpdate(id, { status: 'building', projectFolder: folderName })
 
     send('Initialising clone...')
 
@@ -60,6 +64,10 @@ export const cloneDeployment = async (req: Request, res: Response) => {
     })
 
     send('Project cloned successfully ✓')
+
+    send('Analyzing project with OpenClaw...')
+    await analyzeAndModifyProject(cloneDir)
+    send('OpenClaw analysis complete ✓')
 
     await Deployment.findByIdAndUpdate(id, { status: 'live' })
 
