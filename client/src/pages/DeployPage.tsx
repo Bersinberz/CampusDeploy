@@ -6,25 +6,56 @@ import Loader from '../components/Loader'
 import MessageBox from '../components/MessageBox'
 
 interface DeployForm { name: string; email: string; repoUrl: string }
+interface FormErrors { name?: string; email?: string; repoUrl?: string }
 type Stage = 'form' | 'cloning' | 'done'
 
+function validateForm(form: DeployForm): FormErrors {
+  const errors: FormErrors = {}
+
+  if (!form.name.trim())
+    errors.name = 'Name is required'
+  else if (form.name.trim().length < 2)
+    errors.name = 'Name must be at least 2 characters'
+
+  if (!form.email.trim())
+    errors.email = 'Email is required'
+  else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email))
+    errors.email = 'Must be a valid email address'
+
+  if (!form.repoUrl.trim())
+    errors.repoUrl = 'Repository URL is required'
+  else if (!/^https:\/\/github\.com\/[\w.-]+\/[\w.-]+(\.git)?$/.test(form.repoUrl))
+    errors.repoUrl = 'Must be a valid GitHub URL (e.g. https://github.com/user/repo)'
+
+  return errors
+}
+
 export default function DeployPage() {
-  const [form, setForm]       = useState<DeployForm>({ name: '', email: '', repoUrl: '' })
-  const [stage, setStage]     = useState<Stage>('form')
-  const [logs, setLogs]       = useState<string[]>([])
+  const [form, setForm] = useState<DeployForm>({ name: '', email: '', repoUrl: '' })
+  const [fieldErrors, setFieldErrors] = useState<FormErrors>({})
+  const [stage, setStage] = useState<Stage>('form')
+  const [logs, setLogs] = useState<string[]>([])
   const [loading, setLoading] = useState(false)
-  const [error, setError]     = useState<string | null>(null)
-  const logEndRef             = useRef<HTMLDivElement>(null)
+  const [error, setError] = useState<string | null>(null)
+  const logEndRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     logEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [logs])
 
-  const handleChange = (e: ChangeEvent<HTMLInputElement>) =>
-    setForm(prev => ({ ...prev, [e.target.name]: e.target.value }))
+  const handleChange = (e: ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target
+    setForm(prev => ({ ...prev, [name]: value }))
+    setFieldErrors(prev => ({ ...prev, [name]: undefined }))
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    const errors = validateForm(form)
+    if (Object.keys(errors).length > 0) {
+      setFieldErrors(errors)
+      return
+    }
     setLoading(true)
     setError(null)
     try {
@@ -35,7 +66,7 @@ export default function DeployPage() {
       streamCloneLogs(
         id,
         (msg) => setLogs(prev => [...prev, msg]),
-        ()    => setStage('done')
+        () => setStage('done')
       )
     } catch (err) {
       const message = axios.isAxiosError(err)
@@ -49,7 +80,7 @@ export default function DeployPage() {
 
   // ── Log terminal view ──────────────────────────────────────────────
   if (stage === 'cloning' || stage === 'done') {
-    const isDone  = stage === 'done'
+    const isDone = stage === 'done'
     const isError = logs.some(l => l.startsWith('ERROR'))
 
     return (
@@ -69,17 +100,16 @@ export default function DeployPage() {
               </span>
             )}
             {isDone && !isError && <span className="ml-auto text-emerald-400 text-xs">✓ completed</span>}
-            {isDone && isError  && <span className="ml-auto text-red-400 text-xs">✗ failed</span>}
+            {isDone && isError && <span className="ml-auto text-red-400 text-xs">✗ failed</span>}
           </div>
 
           {/* Log body */}
           <div className="bg-[#0d0d14] border-x border-b border-white/[0.08] rounded-b-2xl p-5 h-80 overflow-y-auto font-mono text-sm space-y-1">
             {logs.map((line, i) => (
-              <div key={i} className={`leading-relaxed ${
-                line.startsWith('ERROR') ? 'text-red-400'
-                : line.includes('✓')    ? 'text-emerald-400'
-                : 'text-slate-300'
-              }`}>
+              <div key={i} className={`leading-relaxed ${line.startsWith('ERROR') ? 'text-red-400'
+                  : line.includes('✓') ? 'text-emerald-400'
+                    : 'text-slate-300'
+                }`}>
                 <span className="text-slate-600 select-none mr-2">$</span>{line}
               </div>
             ))}
@@ -148,19 +178,22 @@ export default function DeployPage() {
             <div className="animate-slide-in delay-100">
               <label htmlFor="name" className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Your name</label>
               <input id="name" name="name" type="text" value={form.name} onChange={handleChange} required
-                className="w-full px-4 py-3 rounded-xl bg-white/[0.04] border border-white/[0.08] text-white placeholder-slate-600 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500/50 focus:border-violet-500/50 hover:border-white/15 transition-all duration-200" />
+                className={`w-full px-4 py-3 rounded-xl bg-white/[0.04] border text-white placeholder-slate-600 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500/50 hover:border-white/15 transition-all duration-200 ${fieldErrors.name ? 'border-red-500/50' : 'border-white/[0.08]'}`} />
+              {fieldErrors.name && <p className="text-red-400 text-xs mt-1.5">{fieldErrors.name}</p>}
             </div>
 
             <div className="animate-slide-in delay-200">
               <label htmlFor="email" className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">College email</label>
               <input id="email" name="email" type="email" value={form.email} onChange={handleChange} required
-                className="w-full px-4 py-3 rounded-xl bg-white/[0.04] border border-white/[0.08] text-white placeholder-slate-600 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500/50 focus:border-violet-500/50 hover:border-white/15 transition-all duration-200" />
+                className={`w-full px-4 py-3 rounded-xl bg-white/[0.04] border text-white placeholder-slate-600 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500/50 hover:border-white/15 transition-all duration-200 ${fieldErrors.email ? 'border-red-500/50' : 'border-white/[0.08]'}`} />
+              {fieldErrors.email && <p className="text-red-400 text-xs mt-1.5">{fieldErrors.email}</p>}
             </div>
 
             <div className="animate-slide-in delay-300">
               <label htmlFor="repoUrl" className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">GitHub repository URL</label>
-              <input id="repoUrl" name="repoUrl" type="url" value={form.repoUrl} onChange={handleChange} required
-                  className="w-full px-4 py-3 rounded-xl bg-white/[0.04] border border-white/[0.08] text-white placeholder-slate-600 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500/50 focus:border-violet-500/50 hover:border-white/15 transition-all duration-200" />
+              <input id="repoUrl" name="repoUrl" type="url" value={form.repoUrl} onChange={handleChange} required placeholder="https://github.com/user/repo"
+                className={`w-full px-4 py-3 rounded-xl bg-white/[0.04] border text-white placeholder-slate-600 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500/50 hover:border-white/15 transition-all duration-200 ${fieldErrors.repoUrl ? 'border-red-500/50' : 'border-white/[0.08]'}`} />
+              {fieldErrors.repoUrl && <p className="text-red-400 text-xs mt-1.5">{fieldErrors.repoUrl}</p>}
             </div>
 
             <div className="animate-slide-in delay-[400ms] pt-1">
@@ -169,9 +202,9 @@ export default function DeployPage() {
                   <MessageBox type="error" title="Error" message={error} onClose={() => setError(null)} />
                 </div>
               )}
-              <button type="submit" disabled={loading}
+              <button type="submit"
                 className="w-full py-3.5 rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 text-white font-semibold text-sm tracking-wide shadow-lg shadow-violet-900/40 hover:shadow-violet-700/50 hover:-translate-y-0.5 active:translate-y-0 transition-all duration-200 cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:translate-y-0">
-                {loading ? 'Deploying...' : 'Deploy my project'}
+                Deploy my project
               </button>
             </div>
 

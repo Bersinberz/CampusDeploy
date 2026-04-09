@@ -11,11 +11,6 @@ const PROJECTS_DIR = path.resolve('projects')
 export const createDeployment = async (req: Request, res: Response) => {
   const { name, email, repoUrl } = req.body
 
-  if (!name || !email || !repoUrl) {
-    res.status(400).json({ error: 'name, email and repoUrl are required' })
-    return
-  }
-
   try {
     const deployment = await Deployment.create({ name, email, repoUrl, status: 'queued' })
     res.status(201).json({ message: 'Deployment queued', deployment })
