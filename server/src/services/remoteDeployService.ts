@@ -1,6 +1,7 @@
 import { NodeSSH } from 'node-ssh'
 import path from 'path'
 import fs from 'fs'
+import { deployLocally } from './localDeployService.js'
 
 export interface DeployResult {
   success:  boolean
@@ -110,11 +111,10 @@ export async function deployToServer(
   folderName: string,
   onLog:      (line: string) => void,
 ): Promise<DeployResult> {
-  if (!SSH_HOST) {
-    const msg = 'SERVER_IP not set in .env — skipping remote deploy'
-    console.warn(`[RemoteDeploy] ${msg}`)
-    onLog(msg)
-    return { success: false, logs: msg }
+  // No remote server configured — deploy locally instead
+  if (!SSH_HOST || process.env.LOCAL_DEPLOY === 'true') {
+    console.log('[Deploy] No SERVER_IP set or LOCAL_DEPLOY=true — deploying locally')
+    return deployLocally(localDir, onLog)
   }
 
   const remoteDir = `${REMOTE_BASE}/${folderName}`
