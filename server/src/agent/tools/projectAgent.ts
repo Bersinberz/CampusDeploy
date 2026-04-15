@@ -159,7 +159,7 @@ function executeTool(projectDir: string, name: string, args: Record<string, unkn
 
 // ── Providers ─────────────────────────────────────────────────────────────
 
-const MAX_ITERATIONS = 25
+const MAX_ITERATIONS = 40
 
 interface LLMProvider { name: string; baseURL: string; apiKey: string; model: string }
 
@@ -360,7 +360,7 @@ ENV:
 
 // ── Main exports ───────────────────────────────────────────────────────────
 
-export interface ProjectAgentInput  { projectDir: string; errorLogs?: string }
+export interface ProjectAgentInput  { projectDir: string; errorLogs?: string; projectContext?: string }
 export interface ProjectAgentOutput { result: AgentResult | null; steps: number }
 
 export async function runProjectAgent(input: ProjectAgentInput, log: Logger): Promise<ProjectAgentOutput> {
@@ -369,7 +369,7 @@ export async function runProjectAgent(input: ProjectAgentInput, log: Logger): Pr
 
   for (const provider of active) {
     log.info(`Starting agent with provider: ${provider.name}`)
-    const result = await runAgentLoop(provider, input.projectDir, input.errorLogs, log)
+    const result = await runAgentLoop(provider, input.projectDir, input.errorLogs, input.projectContext, log)
     if (result) return { result, steps: 0 }
     log.warn(`${provider.name} agent failed, trying next provider...`)
   }
@@ -379,10 +379,11 @@ export async function runProjectAgent(input: ProjectAgentInput, log: Logger): Pr
 }
 
 async function runAgentLoop(
-  provider:   LLMProvider,
-  projectDir: string,
-  errorLogs:  string | undefined,
-  log:        Logger,
+  provider:       LLMProvider,
+  projectDir:     string,
+  errorLogs:      string | undefined,
+  projectContext: string | undefined,
+  log:            Logger,
 ): Promise<AgentResult | null> {
   const client = new OpenAI({ apiKey: provider.apiKey, baseURL: provider.baseURL })
 
@@ -392,7 +393,9 @@ async function runAgentLoop(
       role:    'user',
       content: errorLogs
         ? `Fix the deployment. Previous Docker build failed with these errors:\n\n${errorLogs}\n\nRead the failing source files, fix them with patch_file, then write corrected deployment files.`
-        : 'Analyze the project and generate deployment files. Start by listing the root directory.',
+        : projectContext
+          ? `Analyze the project and generate deployment files. Here is the full project context already collected:\n\n${projectContext}\n\nUse this context to understand the project. You may still use list_directory or read_file if you need more details, but prefer calling write_files as soon as you have enough information.`
+          : 'Analyze the project and generate deployment files. Start by listing the root directory.',
     },
   ]
 

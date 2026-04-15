@@ -77,7 +77,7 @@ export async function runAgent(input: AgentRunInput): Promise<AgentRunOutput> {
   state.step = 'analyze'
   track('Analyzing Your Project...')
   // File collection still runs to emit "Analyzing file:" SSE messages
-  analyzeProject({ projectDir: cloneDir }, log)
+  const { context: projectContext } = analyzeProject({ projectDir: cloneDir }, log)
 
   // ── Agent loop: agent → apply → validate (→ fix → repeat) ─────────────
   while (state.iteration < AGENT_CONFIG.maxIterations) {
@@ -89,7 +89,11 @@ export async function runAgent(input: AgentRunInput): Promise<AgentRunOutput> {
     if (state.iteration > 1) track(`Retrying deployment — attempt ${state.iteration} of ${AGENT_CONFIG.maxIterations}...`)
 
     const agentOut = await runProjectAgent(
-      { projectDir: cloneDir, errorLogs: state.iteration > 1 ? state.lastLogs : undefined },
+      {
+        projectDir: cloneDir,
+        projectContext: state.iteration === 1 ? projectContext : undefined,
+        errorLogs: state.iteration > 1 ? state.lastLogs : undefined,
+      },
       log,
     )
 
